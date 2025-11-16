@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart Generator - AI-Powered Visualization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* Apply custom font and subtle UI tweaks */
+        body { font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+        /* Better scrollbar for sidebar history */
+        #historyList::-webkit-scrollbar { width: 8px; }
+        #historyList::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.12); border-radius: 6px; }
+        /* Slight card lift on hover */
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(2,6,23,0.6); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border-b border-slate-700 sticky top-0 z-50 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-2">
+                    <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <span class="text-white text-lg font-extrabold">📊</span>
+                    </div>
+                    <h1 class="text-2xl font-semibold text-white ml-2">
+                        Chart Generator
+                    </h1>
+                </div>
+                <div class="text-sm text-slate-400">AI-Powered Data Visualization — Upload, Ask, Visualize</div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Dataset Upload Section -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-8 shadow-lg hover:border-slate-600 transition-colors">
+            <h2 class="text-lg font-semibold mb-4 text-green-400 flex items-center">
+                <span class="mr-2">📁</span> Upload Dataset (Required)
+            </h2>
+            <div class="space-y-4">
+                <!-- Drag & Drop Area -->
+                <div
+                    id="dropZone"
+                    class="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center cursor-pointer hover:border-green-500 hover:bg-slate-700/50 transition-all"
+                >
+                    <input
+                        type="file"
+                        id="fileInput"
+                        accept=".csv,.json,.xlsx"
+                        class="hidden"
+                    >
+                    <div id="uploadPrompt" class="space-y-2">
+                        <p class="text-3xl">📤</p>
+                        <p class="text-slate-100 font-medium">Drag & drop your file here</p>
+                        <p class="text-slate-400 text-sm">or <button onclick="document.getElementById('fileInput').click()" class="text-green-400 hover:text-green-300 underline">click to browse</button></p>
+                        <p class="text-slate-500 text-xs">Supported: CSV, JSON, XLSX (Max 50MB)</p>
+                    </div>
+                    <div id="uploadSuccess" class="hidden space-y-2">
+                        <p class="text-2xl">✅</p>
+                        <p class="text-green-400 font-medium" id="fileName">file.csv</p>
+                        <p class="text-slate-400 text-sm" id="fileInfo"></p>
+                        <button
+                            onclick="clearUpload()"
+                            class="text-red-400 hover:text-red-300 underline text-sm mt-2"
+                        >
+                            Upload different file
+                        </button>
+                    </div>
+                </div>
+
+                <!-- File Status -->
+                <div id="uploadStatus" class="hidden px-4 py-3 rounded-lg border">
+                    <div id="uploadError" class="hidden bg-red-900/20 border-red-700 text-red-300 p-3 rounded">
+                        <p id="errorMessage"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-8 shadow-lg hover:border-slate-600 transition-colors">
+            <h2 class="text-lg font-semibold mb-4 text-blue-400 flex items-center">
+                <span class="mr-2">✨</span> Describe Your Chart
+            </h2>
+            <div class="flex flex-col gap-4">
+                <div class="relative">
+                    <textarea
+                        id="queryInput"
+                        placeholder="e.g., 'Show me a bar chart of average stock prices by name' or 'Create a line chart showing opening prices over time'"
+                        class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all"
+                        rows="3"
+                    ></textarea>
+                    <div class="absolute top-2 right-2 text-xs text-slate-500" id="charCount">0/500</div>
+                </div>
+                
+                <div class="flex gap-3 flex-wrap">
+                    <button
+                        onclick="generateChart()"
+                        class="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-lg font-medium transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2"
+                    >
+                        <span>🚀</span> Generate Chart
+                    </button>
+                    <button
+                        onclick="clearQuery()"
+                        class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-all border border-slate-600"
+                    >
+                        🔄 Clear
+                    </button>
+                    <button
+                        onclick="loadSampleQuery()"
+                        class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-all border border-slate-600 flex items-center gap-2"
+                    >
+                        <span>📚</span> Sample Query
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status & Alerts -->
+        <div id="alertContainer"></div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Chart Display -->
+            <div class="lg:col-span-2">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-lg">
+                    <!-- Chart Header -->
+                    <div class="bg-slate-750 border-b border-slate-700 px-6 py-4 flex justify-between items-center">
+                        <h3 class="font-semibold text-slate-100" id="chartTitle">Waiting for chart...</h3>
+                        <div class="flex gap-2">
+                            <button
+                                onclick="resetZoom()"
+                                class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="resetZoomBtn"
+                                disabled
+                            >
+                                🔍 Reset Zoom
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div id="chartContainer" class="w-full bg-slate-700/50 min-h-96" style="height: 600px;">
+                        <div class="h-full flex items-center justify-center">
+                            <div class="text-center text-slate-400">
+                                <p class="text-lg mb-2">📈</p>
+                                <p>Your chart will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Download Controls -->
+                    <div class="bg-slate-750 border-t border-slate-700 px-6 py-4">
+                        <p class="text-sm text-slate-400 mb-3">Download Chart</p>
+                        <div class="flex gap-3 flex-wrap">
+                            <button
+                                onclick="downloadChart('png')"
+                                class="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="downloadPngBtn"
+                                disabled
+                            >
+                                📥 PNG
+                            </button>
+                            <button
+                                onclick="downloadChart('jpeg')"
+                                class="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="downloadJpgBtn"
+                                disabled
+                            >
+                                📥 JPG
+                            </button>
+                            <button
+                                onclick="downloadChart('pdf')"
+                                class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="downloadPdfBtn"
+                                disabled
+                            >
+                                📥 PDF
+                            </button>
+                            <button
+                                onclick="copyChartJson()"
+                                class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="copyJsonBtn"
+                                disabled
+                            >
+                                📋 Copy JSON
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Info & History -->
+            <div class="space-y-6">
+                <!-- Chart Spec Info -->
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 shadow-lg">
+                    <h3 class="font-semibold text-slate-100 mb-4 flex items-center gap-2">
+                        <span>ℹ️</span> Chart Info
+                    </h3>
+                    <div id="chartInfo" class="space-y-2 text-sm text-slate-300">
+                        <p class="text-slate-500">No chart generated yet</p>
+                    </div>
+                </div>
+
+                <!-- Recent Queries -->
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 shadow-lg">
+                    <h3 class="font-semibold text-slate-100 mb-4 flex items-center gap-2">
+                        <span>📌</span> Recent Queries
+                    </h3>
+                    <div id="historyList" class="space-y-2 text-sm max-h-48 overflow-y-auto">
+                        <p class="text-slate-500">No history yet</p>
+                    </div>
+                    <button
+                        onclick="clearHistory()"
+                        class="mt-3 w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs transition-all text-slate-300"
+                        id="clearHistoryBtn"
+                        style="display: none;"
+                    >
+                        Clear History
+                    </button>
+                </div>
+
+                <!-- Keyboard Shortcuts -->
+                <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 shadow-lg">
+                    <h3 class="font-semibold text-slate-100 mb-3 flex items-center gap-2 text-sm">
+                        <span>⌨️</span> Shortcuts
+                    </h3>
+                    <div class="space-y-1 text-xs text-slate-400">
+                        <p><span class="text-blue-400">Enter</span> = Generate</p>
+                        <p><span class="text-blue-400">Ctrl+D</span> = Download PNG</p>
+                        <p><span class="text-blue-400">Ctrl+Shift+D</span> = Download PDF</p>
+                        <p><span class="text-blue-400">Escape</span> = Clear Query</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Upload Loading Overlay -->
+    <div id="uploadLoadingOverlay" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white/5 rounded-lg p-6 text-center border border-slate-700 shadow-xl max-w-sm">
+            <div class="mb-3 flex items-center justify-center">
+                <svg class="animate-spin w-10 h-10 text-green-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-opacity="0.15"/><path d="M22 12a10 10 0 00-10-10" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+            </div>
+            <p class="text-slate-100 font-semibold">Uploading dataset...</p>
+            <p class="text-slate-400 text-sm mt-2">Uploading and parsing file. This may take a few seconds depending on size.</p>
+        </div>
+    </div>
+
+    <!-- Chart Generation Loading Overlay -->
+    <div id="chartLoadingOverlay" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-slate-800 rounded-lg p-8 text-center border border-slate-700 shadow-xl max-w-md">
+            <div class="animate-pulse text-5xl mb-4">✨</div>
+            <p class="text-slate-100 font-semibold">Generating your chart...</p>
+            <p class="text-slate-400 text-sm mt-2">The model is interpreting your request and building the visualization.</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 space-y-2 z-40"></div>
+
+    <script>
+        // ============ STATE ============
+        let currentChart = null;
+        let currentChartSpec = null;
+        let queryHistory = JSON.parse(localStorage.getItem('queryHistory')) || [];
+        let uploadedFile = null;
+        let uploadedFileContent = null;
+
+        const API_BASE_URL = 'http://localhost:8000';
+        const SESSION_ID = 'frontend-' + Date.now();
+
+        // ============ FILE UPLOAD ============
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop zone on drag
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('border-green-500', 'bg-slate-700/50');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('border-green-500', 'bg-slate-700/50');
+            }, false);
+        });
+
+        // Handle drop
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }, false);
+
+        // Handle file input change
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            if (files.length === 0) {
+                showAlert('No file selected', 'error');
+                return;
+            }
+
+            const file = files[0];
+            const validTypes = ['text/csv', 'application/json', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+            const validExt = ['csv', 'json', 'xlsx'];
+            const ext = file.name.split('.').pop().toLowerCase();
+
+            if (!validExt.includes(ext)) {
+                showAlert('Invalid file type. Please upload CSV, JSON, or XLSX', 'error');
+                return;
+            }
+
+            if (file.size > 50 * 1024 * 1024) {
+                showAlert('File too large. Maximum size is 50MB', 'error');
+                return;
+            }
+
+            try {
+                // Read file for preview
+                const fileReader = new FileReader();
+                fileReader.onload = async (e) => {
+                    uploadedFileContent = e.target.result;
+                    uploadedFile = file;
+
+                    // Upload to backend
+                    await uploadFileToBackend(file);
+                };
+                fileReader.readAsArrayBuffer(file);
+            } catch (error) {
+                showAlert(`Error reading file: ${error.message}`, 'error');
+            }
+        }
+
+        async function uploadFileToBackend(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                showUploadLoading(true);
+                const response = await fetch(`${API_BASE_URL}/api/data/upload/${SESSION_ID}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+
+                const data = await response.json();
+
+                // Show success state
+                document.getElementById('uploadPrompt').style.display = 'none';
+                document.getElementById('uploadSuccess').style.display = 'block';
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('fileInfo').innerHTML = `
+                    <span class="text-slate-300">Rows: <span class="text-cyan-400 font-mono">${data.row_count}</span></span>
+                    <span class="text-slate-400 mx-2">•</span>
+                    <span class="text-slate-300">Columns: <span class="text-cyan-400 font-mono">${data.column_count}</span></span>
+                    ${data.columns ? `<br><span class="text-slate-400 text-xs mt-2 block">Columns: ${data.columns.join(', ')}</span>` : ''}
+                `;
+
+                showAlert(`✅ Dataset uploaded successfully! ${data.rows} rows, ${data.columns} columns`, 'success');
+                showUploadLoading(false);
+            } catch (error) {
+                console.error('Upload error:', error);
+                showAlert(`Upload failed: ${error.message}`, 'error');
+                showUploadLoading(false);
+            }
+        }
+
+        function clearUpload() {
+            uploadedFile = null;
+            uploadedFileContent = null;
+            fileInput.value = '';
+            document.getElementById('uploadPrompt').style.display = 'block';
+            document.getElementById('uploadSuccess').style.display = 'none';
+            showToast('Upload cleared', 'info');
+        }
+
+        // ============ CHART GENERATION ============
+        async function generateChart() {
+            if (!uploadedFile) {
+                showAlert('⚠️ Please upload a dataset first', 'error');
+                return;
+            }
+
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                showAlert('Please enter a query', 'error');
+                return;
+            }
+
+            showChartLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/charts/generate/${SESSION_ID}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ user_query: query })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to generate chart');
+                }
+
+                const data = await response.json();
+                currentChart = data.chart_json;
+                currentChartSpec = data.chart_spec;
+
+                // Display chart
+                Plotly.newPlot('chartContainer', data.chart_json.data, data.chart_json.layout, {
+                    responsive: true,
+                    modeBarButtonsToAdd: ['pan2d', 'zoom2d', 'resetScale2d']
+                });
+
+                // Enable download buttons
+                document.getElementById('downloadPngBtn').disabled = false;
+                document.getElementById('downloadJpgBtn').disabled = false;
+                document.getElementById('downloadPdfBtn').disabled = false;
+                document.getElementById('copyJsonBtn').disabled = false;
+                document.getElementById('resetZoomBtn').disabled = false;
+
+                // Update chart info
+                updateChartInfo(data.chart_spec);
+
+                // Add to history
+                addToHistory(query);
+
+                showAlert('Chart generated successfully!', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert(`Error: ${error.message}`, 'error');
+                document.getElementById('chartContainer').innerHTML = `
+                    <div class="h-full flex items-center justify-center">
+                        <div class="text-center text-red-400">
+                            <p class="text-lg mb-2">❌</p>
+                            <p>${error.message}</p>
+                        </div>
+                    </div>
+                `;
+            } finally {
+                showChartLoading(false);
+            }
+        }
+
+        // ============ DOWNLOAD FUNCTIONALITY ============
+        function downloadChart(format) {
+            if (!currentChart) {
+                showAlert('No chart to download', 'error');
+                return;
+            }
+
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const filename = `chart-${timestamp}`;
+
+                if (format === 'pdf') {
+                    // Some browsers / Plotly builds don't reliably export PDF client-side.
+                    // Convert the chart to a PNG first, then embed the PNG into a PDF using jsPDF.
+                    Plotly.toImage('chartContainer', {format: 'png', width: 1200, height: 800})
+                        .then(function(dataUrl) {
+                            // Use jsPDF (UMD build)
+                            const { jsPDF } = window.jspdf;
+                            const pdf = new jsPDF({orientation: 'landscape', unit: 'pt', format: [1200, 800]});
+                            // dataUrl is like 'data:image/png;base64,...'
+                            pdf.addImage(dataUrl, 'PNG', 0, 0, 1200, 800);
+                            pdf.save(filename + '.pdf');
+                        })
+                        .catch(function(err) {
+                            console.error('PDF export failed:', err);
+                            showAlert('PDF export failed in this browser. Try PNG/JPEG.', 'error');
+                        });
+                } else if (format === 'png') {
+                    Plotly.downloadImage('chartContainer', {
+                        format: 'png',
+                        width: 1200,
+                        height: 800,
+                        filename: filename
+                    });
+                } else if (format === 'jpeg') {
+                    Plotly.downloadImage('chartContainer', {
+                        format: 'jpeg',
+                        width: 1200,
+                        height: 800,
+                        filename: filename
+                    });
+                }
+
+            showToast(`Downloading ${format.toUpperCase()}...`, 'success');
+        }
+
+        function copyChartJson() {
+            if (!currentChart) {
+                showAlert('No chart data to copy', 'error');
+                return;
+            }
+
+            const jsonString = JSON.stringify({
+                chart_spec: currentChartSpec,
+                chart_data: currentChart
+            }, null, 2);
+
+            navigator.clipboard.writeText(jsonString).then(() => {
+                showToast('Chart JSON copied to clipboard!', 'success');
+            }).catch(() => {
+                showAlert('Failed to copy to clipboard', 'error');
+            });
+        }
+
+        // ============ ZOOM & INTERACTION ============
+        function resetZoom() {
+            if (currentChart) {
+                Plotly.relayout('chartContainer', {
+                    'xaxis.autorange': true,
+                    'yaxis.autorange': true
+                });
+                showToast('Zoom reset', 'info');
+            }
+        }
+
+        // ============ HISTORY MANAGEMENT ============
+        function addToHistory(query) {
+            // Add to beginning, remove duplicates
+            queryHistory = [query, ...queryHistory.filter(q => q !== query)].slice(0, 10);
+            localStorage.setItem('queryHistory', JSON.stringify(queryHistory));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const historyList = document.getElementById('historyList');
+            if (queryHistory.length === 0) {
+                historyList.innerHTML = '<p class="text-slate-500">No history yet</p>';
+                document.getElementById('clearHistoryBtn').style.display = 'none';
+                return;
+            }
+
+            historyList.innerHTML = queryHistory.map((query, idx) => `
+                <button
+                    onclick="loadHistoryQuery('${query.replace(/'/g, "\\'")}')"
+                    class="w-full text-left px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs transition-all truncate text-slate-300 hover:text-slate-100"
+                    title="${query}"
+                >
+                    ${query.substring(0, 40)}${query.length > 40 ? '...' : ''}
+                </button>
+            `).join('');
+            document.getElementById('clearHistoryBtn').style.display = 'block';
+        }
+
+        function loadHistoryQuery(query) {
+            document.getElementById('queryInput').value = query;
+            generateChart();
+        }
+
+        function clearHistory() {
+            if (confirm('Clear all history?')) {
+                queryHistory = [];
+                localStorage.removeItem('queryHistory');
+                renderHistory();
+                showToast('History cleared', 'info');
+            }
+        }
+
+        // ============ UTILITIES ============
+        function updateChartInfo(spec) {
+            const infoDiv = document.getElementById('chartInfo');
+            document.getElementById('chartTitle').textContent = spec.title || 'Chart';
+            
+            infoDiv.innerHTML = `
+                <div class="space-y-2">
+                    <div>
+                        <p class="text-slate-500 text-xs">Type</p>
+                        <p class="font-mono text-blue-400">${spec.chart_type}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500 text-xs">X-Axis</p>
+                        <p class="font-mono text-cyan-400">${spec.x_axis || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500 text-xs">Y-Axis</p>
+                        <p class="font-mono text-cyan-400">${spec.y_axis || 'N/A'}</p>
+                    </div>
+                    ${spec.aggregation && spec.aggregation !== 'none' ? `
+                        <div>
+                            <p class="text-slate-500 text-xs">Aggregation</p>
+                            <p class="font-mono text-green-400">${spec.aggregation}</p>
+                        </div>
+                    ` : ''}
+                    ${spec.color_by ? `
+                        <div>
+                            <p class="text-slate-500 text-xs">Color By</p>
+                            <p class="font-mono text-purple-400">${spec.color_by}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function clearQuery() {
+            document.getElementById('queryInput').value = '';
+            updateCharCount();
+        }
+
+        function loadSampleQuery() {
+            const samples = [
+                "Show me a bar chart of average closing prices by stock name",
+                "Create a line chart of opening prices over time",
+                "Display a scatter plot of opening vs closing prices",
+                "Generate a pie chart of high prices distribution"
+            ];
+            const random = samples[Math.floor(Math.random() * samples.length)];
+            document.getElementById('queryInput').value = random;
+            updateCharCount();
+        }
+
+        function showUploadLoading(show) {
+            document.getElementById('uploadLoadingOverlay').classList.toggle('hidden', !show);
+        }
+
+        function showChartLoading(show) {
+            document.getElementById('chartLoadingOverlay').classList.toggle('hidden', !show);
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertEl = document.createElement('div');
+            alertEl.className = `px-6 py-3 rounded-lg border flex items-center gap-3 mb-4 animate-pulse ${
+                type === 'error' ? 'bg-red-900/20 border-red-700 text-red-300' :
+                type === 'success' ? 'bg-green-900/20 border-green-700 text-green-300' :
+                'bg-blue-900/20 border-blue-700 text-blue-300'
+            }`;
+            alertEl.innerHTML = `
+                <span>${type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️'}</span>
+                <p>${message}</p>
+            `;
+            alertContainer.appendChild(alertEl);
+            setTimeout(() => alertEl.remove(), 4000);
+        }
+
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `px-4 py-3 rounded-lg border flex items-center gap-2 animate-bounce ${
+                type === 'error' ? 'bg-red-900/40 border-red-700 text-red-300' :
+                type === 'success' ? 'bg-green-900/40 border-green-700 text-green-300' :
+                'bg-blue-900/40 border-blue-700 text-blue-300'
+            }`;
+            toast.innerHTML = `
+                <span>${type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️'}</span>
+                <p class="text-sm">${message}</p>
+            `;
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function updateCharCount() {
+            const input = document.getElementById('queryInput');
+            document.getElementById('charCount').textContent = `${input.value.length}/500`;
+        }
+
+        // ============ KEYBOARD SHORTCUTS ============
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                generateChart();
+            } else if (e.key === 'd' && e.ctrlKey) {
+                e.preventDefault();
+                downloadChart(e.shiftKey ? 'pdf' : 'png');
+            } else if (e.key === 'Escape') {
+                clearQuery();
+            }
+        });
+
+        // ============ INPUT TRACKING ============
+        document.getElementById('queryInput').addEventListener('input', updateCharCount);
+        document.getElementById('queryInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                generateChart();
+            }
+        });
+
+        // ============ INITIALIZATION ============
+        renderHistory();
+        showAlert('👋 Welcome! Upload a dataset, describe your chart, and click Generate', 'info');
+    </script>
+</body>
+</html>
