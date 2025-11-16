@@ -61,7 +61,3 @@ Development tips
 
 - Keep the backend running with `--reload` while you update the server files.
 - For debugging LLM outputs, add temporary logging in `services/llm_handler.py` to view the raw text and parsed JSON.
-
-License
-
-- Add your preferred license here.
